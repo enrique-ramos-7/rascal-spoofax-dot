@@ -1,0 +1,5 @@
+module concat
+
+rules
+	concat(|[x|xs]): ys -> [x |<concat(|xs)> ys] 
+	concat(|[]): ys -> ys 

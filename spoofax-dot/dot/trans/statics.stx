@@ -1,0 +1,165 @@
+module statics
+
+// see README.md for details on how to switch to multi-file analysis
+imports
+	  signatures/dot-sig
+
+signature
+	sorts
+		CHECK-TYPE
+	constructors
+		COLOR : CHECK-TYPE
+		NUMERIC : CHECK-TYPE
+		FONT : CHECK-TYPE
+		STRING : CHECK-TYPE
+		NODE : CHECK-TYPE
+		
+	relations
+		var  : Identifier -> CHECK-TYPE
+		str  : string
+		edge : Identifier * Identifier
+		
+ 	name-resolution
+    	labels
+      		P C
+
+	
+rules // single-file entry point
+
+  programOk : Start
+  graphOk : Graph
+  stmtListOk: scope * Stmt_list
+  stmtOk  : scope * Stmt
+  subgraphOk : scope * Subgraph
+  nodeStmtOk : scope * Node_stmt
+  nodeIdOk : scope * Node_id
+  attrListOk : Attr_list
+  aListOk : A_list
+  edgeStmtOk: scope * Edge_stmt
+  rhsOk: scope * Identifier * list(EdgeRHS)
+  declareNode: scope * Node_id
+  retrieveNode: scope * Identifier
+  queryScopeVar: scope * Identifier ->  list((path * (Identifier * CHECK-TYPE)))
+  edgeTypeOk: scope * EDGE
+  queryScopeStr: scope * string ->  list((path * (string)))
+  strictOk: scope * Identifier * Identifier * list((path * (string)))
+  queryScopeEdge: scope * Identifier * Identifier ->  list((path * (Identifier * Identifier)))
+  addEdge: scope *(Identifier * Identifier) * list((path *(string)))
+
+  programOk(DOT(g)) :- graphOk(g).
+  graphOk(Graph(["strict"],dir,_,stmts)) :- {s} new s, !str[dir] in s, !str["strict"] in s, stmtsOk(s,stmts).
+  graphOk(Graph([],dir,_,stmts)) :- {s} new s, !str[dir] in s, stmtsOk(s,stmts).
+  
+  stmtsOk maps stmtListOk(*,list(*))
+  stmtListOk(s, Stmt_list(stmt,_)) :- stmtOk(s,stmt).
+  
+  stmtOk(s,Id(String(attr),val)) :- typesEqual(typeOfAttr(attr),typeOfVal(val)).
+  stmtOk(s,Subgraph(g)) :- subgraphOk(s,g).
+  stmtOk(s,Node_stmt(ns)) :- nodeStmtOk(s,ns).
+  stmtOk(s,Edge_stmt(es)) :- edgeStmtOk(s,es).
+  
+  nodeStmtOk(s,Node_stmt(id,attrs)) :- declareNode(s,id), nodeIdOk(s,id), attrsOk(attrs).
+  attrsOk maps attrListOk(list(*))
+  attrListOk(Attr_list(a_lists)) :- aListsOk(a_lists).
+  aListsOk maps aListOk(list(*))
+  
+  aListOk(A_list(String(attr),val,_)) :- typesEqual(typeOfAttr(attr),typeOfVal(val)).
+  
+  nodeIdOk(s,Node_id(id,_)) :- retrieveNode(s,id).
+  
+  declareNode(s,Node_id(id,_)) :- !var[id,NODE()] in s.
+  
+  retrieveNode(s,id) :- try {queryScopeVar(s,id) == [(_,(id,NODE()))|_]} |warning $[Node has not been declared].
+  
+  queryScopeVar(s,id) = n :- 
+  	query var
+  		filter P* and {id' :- id' == id }
+  			min $ < P and true
+  				in s |-> n.
+  				
+
+  
+  edgeStmtOk(s,Edge_stmt_node(Node_id(id,_),rhs,attrs)) :- retrieveNode(s,id), rhsOk(s,id,[rhs]), attrsOk(attrs). 
+  rhsOk(s,lstId,[EdgeRHS_node(e,Node_id(id,_),rhs)]) :- edgeTypeOk(s,e), strictOk(s,lstId,id,queryScopeStr(s,"strict")),retrieveNode(s,id), //Don't need a stack
+  	rhsOk(s,id,rhs).
+  rhsOk(s,lstId,[]).
+  
+  edgeTypeOk(s,"--") :- queryScopeStr(s,"graph") == [(_,("graph"))|_].
+  edgeTypeOk(s,"->") :- queryScopeStr(s,"digraph") == [(_,("digraph"))|_]. 
+  
+  queryScopeStr(s,str) = scopeStr :- 
+  	query str
+  		filter P* and { str' :- str' == str }
+  			min and true
+  				in s |-> scopeStr. 
+  
+  strictOk(s,lstId,id,[(_,("strict"))]) :- try{queryScopeEdge(s,lstId,id) == [(_,(lstId,id))]}  |warning $[Strict graphs do not allow multi-edges], //Error if not only one result
+  																		 addEdge(s,(lstId,id),queryScopeStr(s,"digraph")). //Adding edges means prev comparison fails for []
+  strictOk(_,_,_,_).
+  
+  addEdge(s,(a,b),[(_,("digraph"))]) :- !edge[a,b] in s.
+  addEdge(s,(a,b),[]) :- !edge[a,b] in s, !edge[b,a] in s.
+  
+  queryScopeEdge(s,a,b) = e :- 
+  	query edge
+  		filter (P|C)* and {(a',b') :- (a',b') == (a,b) }
+  			min and true
+  				in s |-> e,
+  				@a.test := e.  
+  
+  				
+  subgraphOk(s,Subgraph(_,_,stmts)) :- {new_s} new new_s, new_s -P-> s, s -C-> new_s, stmtsOk(new_s, stmts).
+  subgraphOk(s,Subgraph_anon(stmts)) :- {new_s} new new_s, new_s -P-> s, s -C-> new_s, stmtsOk(new_s, stmts).
+  
+  
+  typesEqual : CHECK-TYPE * CHECK-TYPE  
+  typeOfAttr : IDENTIFIER -> CHECK-TYPE
+  typeOfVal : Identifier -> CHECK-TYPE
+  typeOfValStr : IDENTIFIER -> CHECK-TYPE
+  
+  
+  typesEqual(t1,t2) :- t1 == t2 |error $[Types [t1] and [t2] do not match]. //type with itself
+  typesEqual(STRING(),COLOR()). //color matches string, not v.v.
+  typesEqual(STRING(),FONT()).
+  
+  typeOfAttr("color") = COLOR(). typeOfAttr("bgcolor") = COLOR(). typeOfAttr("fillcolor") = COLOR().  typeOfAttr("pencolor") = COLOR().
+  typeOfAttr("penwidth") = NUMERIC(). typeOfAttr("fontsize") = NUMERIC().
+  typeOfAttr("style") = STRING(). typeOfAttr("label") = STRING().
+  typeOfAttr("fontname") = FONT().
+  typeOfAttr(s) = STRING() :- false |error $[[s] is not a valid attribute].
+  
+  typeOfVal(String(v)) = typeOfValStr(v).
+  typeOfVal(Int(v)) = NUMERIC().
+  
+  typeOfValStr("red") = COLOR(). typeOfValStr("\"red\"") = COLOR(). 
+  typeOfValStr("orange") = COLOR(). typeOfValStr("\"orange\"") = COLOR().
+  typeOfValStr("yellow") = COLOR(). typeOfValStr("\"yellow\"") = COLOR(). 
+  typeOfValStr("green") = COLOR(). typeOfValStr("\"green\"") = COLOR().
+  typeOfValStr("blue") = COLOR(). typeOfValStr("\"blue\"") = COLOR(). 
+  typeOfValStr("indigo") = COLOR(). typeOfValStr("\"indigo\"") = COLOR().
+  typeOfValStr("violet") = COLOR(). typeOfValStr("\"violet\"") = COLOR().
+  
+  typeOfValStr("times") = FONT(). typeOfValStr("\"times\"") = FONT(). 
+  typeOfValStr("helevetica") = FONT(). typeOfValStr("\"helevetica\"") = FONT().
+  typeOfValStr("arial") = FONT(). typeOfValStr("\"arial\"") = FONT().
+  typeOfValStr("\"comic sans ms\"") = FONT().
+
+  typeOfValStr(v) = STRING().
+  
+  
+
+
+  
+
+
+
+//rules multi-file entry point
+//
+//  projectOk : scope
+//
+//  projectOk(s).
+//
+//  fileOk : scope * Start
+//
+//  fileOk(s, Empty()).
+

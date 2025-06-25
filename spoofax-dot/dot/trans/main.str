@@ -1,0 +1,18 @@
+module main
+
+imports
+  libstratego-lib
+  signatures/dot-sig
+  model
+  
+
+rules
+  // Prints the abstract syntax ATerm of a selection.
+  print-to-model: (selected, _, _, path, project-path) -> (filename, result)
+    with filename := <guarantee-extension(|"aterm")> path
+       ; result   := selected
+  
+  get-graph: Graph(a,b,c,d) -> Graph(a,b,c,d)
+  
+  
+  

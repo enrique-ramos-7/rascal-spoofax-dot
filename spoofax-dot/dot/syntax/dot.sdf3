@@ -1,0 +1,78 @@
+module dot
+
+imports
+  
+  Common
+  
+lexical sorts
+IDENTIFIER STRICT TYPE SEMI COMMA SEP DIRECTED UNDIRECTED EDGE COMPASS COMPASSOPT ELEMENT
+KEYWORD SUBGRAPH INTEGER
+
+lexical syntax
+
+//IDENTIFIER = "z"
+KEYWORD = 'graph' | 'node' | 'edge' | 'subgraph'
+IDENTIFIER = KEYWORD {reject}
+IDENTIFIER = ID
+IDENTIFIER = STRING
+INTEGER = [0-9]+
+
+STRICT = 'strict'
+TYPE = 'graph'|'digraph'
+ELEMENT = 'graph' | 'node' | 'edge'
+SEMI = ";"
+COMMA = ","
+SEP = SEMI | COMMA
+DIRECTED = "->"
+UNDIRECTED = "--"
+EDGE = UNDIRECTED | DIRECTED
+COMPASS = "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "nw" | "_"
+COMPASSOPT = (";" COMPASS) 
+SUBGRAPH = 'subgraph'
+
+lexical restrictions
+  INTEGER -/- [0-9]
+context-free start-symbols
+  
+  Start
+
+context-free sorts
+
+  Start Graph Stmt_list Stmt Attr_stmt Node_stmt Node_id Attr_list 
+  A_list Edge_stmt EdgeRHS Subgraph Port Identifier
+  
+
+context-free syntax
+  
+	Start.DOT = Graph
+	Graph.Graph = <<STRICT?> <TYPE> <Identifier?> { 
+		<Stmt_list*> 
+	}>
+	Stmt_list.Stmt_list = Stmt SEMI?
+	
+	Stmt.Attr_stmt = Attr_stmt
+	Stmt.Edge_stmt = Edge_stmt
+	Stmt.Node_stmt = Node_stmt	
+	Stmt.Id = Identifier "=" Identifier
+	Stmt.Subgraph = Subgraph
+	
+	Attr_stmt.Attr_stmt = ELEMENT Attr_list+
+	Attr_list.Attr_list = "[" A_list* "]" 
+	A_list.A_list = Identifier "=" Identifier SEP? 
+
+	Edge_stmt.Edge_stmt_node = Node_id EdgeRHS Attr_list*
+	Edge_stmt.Edge_stmt_sub = Subgraph EdgeRHS Attr_list*
+	EdgeRHS.EdgeRHS_node = EDGE Node_id EdgeRHS?
+	EdgeRHS.EdgeRHS_sub = EDGE Subgraph EdgeRHS?
+	
+	Node_stmt.Node_stmt = Node_id Attr_list*
+	Node_id.Node_id = Identifier Port?
+	Port.Port_id = ":" Identifier COMPASSOPT? 
+	Port.Port_comp = COMPASSOPT
+	
+	Subgraph.Subgraph = SUBGRAPH Identifier? "{" Stmt_list* "}" 
+	Subgraph.Subgraph_anon = "{" Stmt_list* "}" 
+	
+	Identifier.Int = INTEGER
+	Identifier.String = IDENTIFIER
+	

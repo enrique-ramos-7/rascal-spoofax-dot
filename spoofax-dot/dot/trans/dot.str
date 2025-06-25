@@ -1,0 +1,126 @@
+module dot
+
+imports
+  libstratego-lib
+  signatures/dot-sig
+  gen/model
+  gen/concat
+  gen/svg
+  gen/layout
+  gen/generator
+  
+imports
+  
+  completion/completion
+  pp
+  outline
+  analysis
+
+rules 
+  
+  debug-show-aterm:
+    (node, _, _, path, project-path) -> (filename, result)
+    with
+      filename := <guarantee-extension(|"aterm")> path
+    ; result   := node
+
+  /*Returns a tuple of a graph representation of DOT code and all edges */
+  print-to-model: (selected, _, ast, path, project-path) -> (filename, result)
+    with filename := <guarantee-extension(|"aterm")> path
+       ; <?DOT(Graph(strict,type,name,stmts))> <topdown(get-id)> ast
+       ; (graph,_)   := <get-graph(|name,[],stmts)> 
+       ; nodes := <filter-node_id> stmts
+       ; (graph-2,_,_) := <get-layout(|(0,0))> <get-node-attributes(|nodes)> <add-str-dir(|strict,type)> graph 
+       ; graph-nodes := <get-graph-nodes> [graph-2]
+       ; edges := <all(insert-edge-nodes(|graph-nodes))> <filter-edges> stmts
+       ; result := (graph-2,edges)
+
+  /*Returns a graph represented by the DOT code input as an SVG file.*/
+  print-to-svg: (selected, _, ast, path, project-path) -> (filename, result)
+    with filename := <guarantee-extension(|"svg")> path
+       ; <?DOT(Graph(strict,type,name,stmts))> <topdown(get-id)> ast
+       ; (graph,_)   := <get-graph(|name,[],stmts)> //get-graph recursively creates Graph_models from AST graphs and subgraphs
+       ; nodes := <filter-node_id> stmts
+       ; (graph-2,_,_) := <get-layout(|(0,0))> <get-node-attributes(|nodes)> <add-str-dir(|strict,type)> graph //Adds additional info
+       ; graph-nodes := <get-graph-nodes> [graph-2]
+       ; edges := <all(insert-edge-nodes(|graph-nodes))> <filter-edges> stmts //filters a list of edges as Edge() (model constructor), then adds real attributes
+       ; result := <print-svg(|graph-2,edges)>     
+ 
+rules 
+
+	/*Add the strict and directed attributes to the top level graph*/
+ 	add-str-dir(|strict,type): Graph_model(a,b,c,attributes) -> Graph_model(a,b,c,<concat (|[s,t])> attributes)   
+ 		with s := Attribute("strict",<normalize-string> strict);
+ 	 		 t := Attribute("directed",type)   
+ 
+ 	/*Given a list of edges and a list of nodes (both for the model), Insert nodes into the appropriate edges*/
+ 	insert-edge-nodes(|nodes): Edge(Node(a,_),Node(b,_),attr) -> Edge(n1,n2,attr)
+ 		with n1 := <get-edge-node(|nodes)> a; n2 := <get-edge-node(|nodes)> b  
+ 	get-edge-node(|[Node(name,attr)|nodes]): name -> Node(name,attr)
+ 	get-edge-node(|[Node(name,attr)|nodes]): x -> <get-edge-node(|nodes)> x
+ 	get-edge-node(|[]): x -> Node(x,[])
+ 
+ 	/*Get all Nodes from a Graph_model, including nodes in subgraphs. For recursion's sake takes a list of graphs 
+ 	  since that's how subgraphs are stored. Returns a list of all nodes.*/
+ 	get-graph-nodes: [Graph_model(_,subgraphs,nodes,_)| graphs] -> 
+ 		<concat(|<concat(|nodes)> <get-graph-nodes> subgraphs)> <get-graph-nodes> graphs
+ 	get-graph-nodes: [] -> []  
+ 
+ 
+ 	/*Retrieve all edges from the AST in the form of the Edge constructor. Recursivley gets from subgraphs, also transforms
+ 	  attributes into model constructor Attribtute*/
+ 	filter-edges: [Stmt_list(Edge_stmt(Edge_stmt_node(Node_id(a,_),EdgeRHS_node(_,Node_id(b,_),rhs),attributes)),_) | stmts] 
+ 		-> [Edge(Node(a,[]),Node(b,[]), <transform-attributes> attributes) | <concat(|edges)> <filter-edges> stmts]
+ 		with edges := <filter-edges> EdgeRHS_node("",Node_id(b,attributes),rhs)
+ 	
+	filter-edges: EdgeRHS_node(_,Node_id(a,attributes),Some(EdgeRHS_node(_,Node_id(b,_),rhs))) 
+ 		-> [Edge(Node(a,[]),Node(b,[]), <transform-attributes> attributes) | edges]
+ 		with edges := <filter-edges> EdgeRHS_node("",Node_id(b,attributes),rhs)
+	
+	filter-edges: EdgeRHS_node(_,Node_id(a,attributes),None()) -> []	
+	filter-edges: [Stmt_list(Subgraph(Subgraph(_,_,s)),_)|stmts] -> <concat(|edges)> <filter-edges> stmts
+		with edges := <filter-edges> s
+	filter-edges: [Stmt_list(_,_) |stmts] -> [|<filter-edges> stmts]
+	filter-edges: [] -> []
+ 
+ 
+ 	/*Retrieve attributes for each node a Grap_model by going through a list of nodes from the AST and adding their attributes to 
+ 	  the relevant node in the model*/
+ 	get-node-attributes(|[Node_stmt(Node_id(name,_),attributes) |nodes]): graph -> updated-graph
+ 		with model-attributes := <transform-attributes> attributes;
+ 			 updated-graph := <topdown(add-node-attributes(|name,model-attributes))> <get-node-attributes(|nodes)> graph
+ 	get-node-attributes(|[]): graph -> graph
+ 
+ 	/*Matches a node with a given name and then merges its attributes with a list of new ones*/ 	
+	add-node-attributes(|name,new-attr): Node(name,old-attr) -> Node(name, updated-attr)
+	 	with updated-attr := <merge-attributes(|old-attr)> new-attr
+	add-node-attributes(|_,_): x -> x  
+	
+	 /*Given a list of Attr_list, return a list of all attributes with the Attribute() constructor*/ 
+	transform-attributes: [Attr_list(a_list) | attributes] -> <concat(|model-list)> <transform-attributes> attributes
+	 	with model-list := <transform-attributes> a_list
+	transform-attributes: [A_list(a,b,_)| attributes] -> [Attribute(a,b) | <transform-attributes> attributes]
+	transform-attributes: [] -> []
+ 
+ 	/*Given a stmt_list, filter out only Node_id constructors from the entire ast, including all subgraphs*/
+	filter-node_id: [Stmt_list(Node_stmt(n),_)|stmts] -> [n |<filter-node_id> stmts]
+	filter-node_id: [Stmt_list(Subgraph(Subgraph(_,_,s)),_)|stmts] -> <concat(|nodes)> <filter-node_id> stmts
+		with nodes := <filter-node_id> s
+	filter-node_id: [Stmt_list(_,_) |stmts] -> [|<filter-node_id> stmts]
+	filter-node_id: [] -> []
+ 
+   	get-id: String(x) -> x
+  	get-id: Int(x) -> x
+  	get-id: x -> x
+ 
+ 
+
+
+								    
+  								    
+ 
+
+
+	
+		
+							    

@@ -1,0 +1,52 @@
+module pp
+
+imports
+  libstratego-lib
+
+imports
+
+  libstratego-gpp
+  libspoofax/sdf/pp
+  libspoofax/editor/refactoring/-
+  pp/dot-parenthesize
+  pp/dot-pp
+
+rules
+
+  editor-format:
+    (node, _, ast, path, project-path) -> (filename, result)
+    with
+      ext      := <get-extension> path
+    ; filename := <guarantee-extension(|$[pp.[ext]])> path
+    ; result   := <pp-debug> node
+
+rules
+  
+  pp-dot-string =
+    parenthesize-dot
+    ; prettyprint-dot-start-symbols
+    ; !V([], <id>)
+    ; box2text-string(|120)
+      
+  pp-partial-dot-string =
+    parenthesize-dot
+    ; prettyprint-dot
+    ; !V([], <id>)
+    ; box2text-string(|120)
+    
+  pp-partial-dot-string(|sort) =
+    parenthesize-dot
+    ; prettyprint-dot(|sort)
+    ; !V([], <id>)
+    ; box2text-string(|120)  
+      
+  pp-debug :
+    ast -> result
+    with
+       result := <pp-dot-string> ast
+    <+ <bottomup(try(not(is-string); not(is-list); not(pp-dot-string); debug(!"cannot pp ")))> ast
+    ;  result := ""
+
+rules
+  
+  construct-textual-change = construct-textual-change(pp-partial-dot-string, parenthesize, override-reconstruction, resugar)

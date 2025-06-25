@@ -1,0 +1,14 @@
+module model
+
+imports
+   signatures/dot-sig
+
+signature
+	constructors
+					: string -> IDENTIFIER
+					: string -> NAME
+		Graph_model	: NAME * List(Graph_model) * List(Node) * List(Attribute) -> Graph
+		Node        : NAME * List(Attribute) -> Node_stmt
+		Attribute   : IDENTIFIER * IDENTIFIER -> A_list
+		Edge        : Node * Node * List(Attribute) -> Edge_stmt
+		

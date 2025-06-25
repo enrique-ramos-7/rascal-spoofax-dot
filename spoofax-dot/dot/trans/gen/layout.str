@@ -1,0 +1,61 @@
+module layout
+
+imports
+  libstratego-lib
+  signatures/dot-sig
+  gen/model
+  gen/concat
+  
+strategies  			/*Calculate layour recursively per subgraph, record as attributes*/
+  get-layout(|(x,y)) = ?Graph_model(name,subgraphs,nodes,attributes);
+  					   margin := 50;
+				      (coord-x,coord-y) := (<add> (margin,x),<add> (margin,y)); //Keep track of "pointer" where we are drawing the next graph/node
+				      (init-x,init-y) := (coord-x,coord-y); 
+				      grid-length := 3; //Ideally this would be dynamic, length of grid in graph      
+				      init-biggest-x := init-x; //Keep track of largest x value so far
+				      next-y := <add>(init-y,150); //Keep track of next y when reaching end of grid, base +150 but subgraphs may be larger
+				      
+				      /*Calc layout for each subgraph, get back current length and coords (drawing pointer). Also bigggest-x, next-y still kept track of*/
+				      (layout-subgraphs,coord-x-2,coord-y-2,current-length,biggest-x-1,next-y-2) := 
+				      	<get-layout-subgraphs(|(coord-x,coord-y),0,grid-length,init-x,init-biggest-x,next-y)> subgraphs;
+				      /*Calc layout for nodes, same deal except we return fewer thing naturally */
+				      (layout-nodes,coord-x-3,coord-y-3,biggest-x-2,next-y-3) := 
+				      	<get-layout-nodes(|(coord-x-2,coord-y-2),current-length,grid-length,init-x,biggest-x-1,next-y-2)> nodes;
+				     
+				      /*Final x if biggiest x so far, final y is next expect y*/
+				      max-x := <add>(biggest-x-2, 50); max-y := <add> (next-y-3,50);
+				      new-attr := [Attribute("max_x",<write-to-string> max-x), Attribute("max_y",<write-to-string> max-y),
+			 			  Attribute("initial_x",<write-to-string> init-x),  Attribute("initial_y",<write-to-string> init-y)];
+				      !(Graph_model(name,layout-subgraphs,layout-nodes,<concat(|new-attr)>attributes),max-x,max-y)
+
+rules 
+		/*Calclulate layout for each subgraph. If we go over grid length, reset current length and update coords
+		  Keep track of biggest x and next y*/
+	get-layout-subgraphs(|(coord-x,coord-y),current-len,grid-len,init-x,biggest-x,next-y): [s|subgraphs] 
+		-> ([layout-subgraph|layout-subgraphs],ret-x,coord-y-2,ret-len,ret-biggest-x,ret-next-y)
+		with if <geq> (current-len,grid-len) 
+			 then updated-len := 0; (coord-x-2,coord-y-2) := (init-x,next-y); next-y-2 := <add>(coord-y-2,150) //If over grid-len, rest x, y is next-y, reset next-y
+			 else updated-len := current-len; (coord-x-2,coord-y-2) := (coord-x,coord-y); next-y-2 := next-y end;
+			 (layout-subgraph, new-x,new-y) := <get-layout(|(coord-x-2,coord-y-2))> s;
+			 new-biggest-x := <max> (biggest-x,new-x); 	
+			 new-next-y := <max> (next-y-2,new-y); 
+			 (layout-subgraphs,ret-x,ret-y,ret-len,ret-biggest-x,ret-next-y) := 
+			 	<get-layout-subgraphs(|(new-x,coord-y-2),<inc>updated-len,grid-len,init-x,new-biggest-x,new-next-y)> subgraphs
+			 	
+	get-layout-subgraphs(|(coord-x,coord-y),current-len,grid-len,init-x,biggest-x,next-y): [] -> ([],coord-x,coord-y,current-len,biggest-x,next-y)			    
+  	
+  								    
+	get-layout-nodes(|(coord-x,coord-y),current-len,grid-len,init-x,biggest-x,next-y): [Node(name,attr)|nodes] 
+		-> ([layout-node |layout-nodes],ret-x,ret-y,ret-biggest-x,ret-next-y)
+		with if <geq> (current-len,grid-len) 
+			 then updated-len := 0; (coord-x-2,coord-y-2) := (init-x,next-y); next-y-2 := <add>(coord-y-2,150) 
+			 else updated-len := current-len; (coord-x-2,coord-y-2) := (coord-x,coord-y); next-y-2 := next-y end;
+			 new-attr := [Attribute("cx",<write-to-string> <add>(coord-x-2,50)), Attribute("cy",<write-to-string> <add>(coord-y-2,75)),
+			 			  Attribute("rx",<write-to-string> 35),  Attribute("ry",<write-to-string> 37)];
+			 layout-node := Node(name,<concat(|new-attr)> attr);
+			 new-biggest-x := <max>(biggest-x,<add>(coord-x-2,100));
+			 new-next-y := <max>(next-y-2,<add> (150,coord-y));
+			 (layout-nodes,ret-x,ret-y,ret-biggest-x,ret-next-y) := 
+			 	<get-layout-nodes(|(<add>(coord-x-2,100),coord-y-2),<inc>updated-len,grid-len,init-x,new-biggest-x,new-next-y)> nodes
+			 		 
+	get-layout-nodes(|(coord-x,coord-y),current-len,grid-len,init-x,biggest-x,next-y): [] -> ([],coord-x,coord-y,biggest-x,next-y)  

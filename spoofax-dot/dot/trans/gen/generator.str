@@ -1,0 +1,82 @@
+module generator
+
+imports
+  libstratego-lib
+  signatures/dot-sig
+  gen/model
+  gen/concat
+  
+strategies  
+
+  get-graph(|name,all-nodes,stmts) = <filter-subgraphs> stmts => sub_list; //Filter subgraphs of current graph
+  									(subgraphs,all-nodes-2) := <get-subgraphs(|all-nodes)> sub_list; //Get Graph_models of each subgraph
+ 	  								(nodes,all-nodes-3) := <get-nodes(|all-nodes-2)> <filter-nodes> stmts; // Filter all node statements, get Node models. Record all new nodes.
+ 	  								attributes := <get-graph-attributes> stmts; //Get attributes of graph
+ 	  								subgraphs-2 := <cascade-graph-attributes(|attributes)> subgraphs; //Ensure lower graphs inherit attributes if they don't have their own
+ 	  								graph := Graph_model(name,subgraphs-2,nodes,attributes); //Construct Graph_model from collect info, also return all nodes for later use
+  									!(graph,all-nodes-3)   
+
+
+rules
+	/*predicate to check if x is in a list, otherwise fails. There is probably a standard func for this, but I couldn't find it so oh well*/ 
+	contains(|x): [x |xs] -> []
+	contains(|x): [y |xs] -> <contains(|x)> xs
+	contains(|_): [] -> []
+		where fail
+	
+	/*Filter node-stmts from a list of stmt, basically the nodes in a subgraph, not going into lower subgraphs*/
+	filter-nodes: [Stmt_list(Node_stmt(Node_stmt(n,_ ) ),_)|stmts] -> [n |<filter-nodes> stmts]
+	filter-nodes: [Stmt_list(Edge_stmt(e),_)|stmts] -> <concat(|n)> <filter-nodes> stmts
+		with n := <get-edge-nodes> e
+	filter-nodes: [Stmt_list(_,_) |stmts] -> [|<filter-nodes> stmts]
+	filter-nodes: [] -> []
+	
+	/*Get all nodes in an Edge_stmt, including from rhs*/
+	get-edge-nodes: Edge_stmt_node(n,rhs,_) -> nodes
+		with nodes := [n |<get-rhs-nodes> rhs]
+	get-rhs-nodes: EdgeRHS_node(_,n,rhs) -> [n |<get-rhs-nodes> rhs]
+	get-rhs-nodes: Some(EdgeRHS_node(_,n,rhs)) -> [n |<get-rhs-nodes> rhs]
+	get-rhs-nodes: None() -> []	
+	
+	
+	/*Given a list of attributes, merge each attribute into another list of attributes. Priority to old-attr*/
+	merge-attributes(|old-attr): [attr | new-attr] -> <merge-attributes(|updated-attr)> new-attr //left-side attributes get priority
+		with updated-attr := <merge-attribute(|attr)> old-attr
+	merge-attributes(|old-attr): [] -> old-attr
+	/*Given a new attribute, add it a list of a attributes if it does not already exist*/
+	merge-attribute(|Attribute(a,b1)): [Attribute(a,b2) | ys] -> [Attribute(a,b2) |ys]
+	merge-attribute(|Attribute(a1,b1)): [Attribute(a2,b2) | ys] -> [Attribute(a2,b2) | <merge-attribute(|Attribute(a1,b1))> ys]
+	merge-attribute(|Attribute(a,b)): [] -> [Attribute(a,b)]
+	
+	/*filter out subgraphs from a stmt_list*/
+	filter-subgraphs: [Stmt_list(Subgraph(s),_) |stmts] -> [s |<filter-subgraphs> stmts]
+	filter-subgraphs: [Stmt_list(_,_) |stmts] -> [|<filter-subgraphs> stmts]
+	filter-subgraphs: [] -> []
+	
+	
+	/*Recursively get graph models for al subgraphs*/
+	get-subgraphs(|all-nodes): [Subgraph(_,name,stmts) | sub_list] -> ([subgraph | subgraphs],return-nodes)
+		with (subgraph,new-nodes) := <get-graph(|name,all-nodes,stmts)>; //Get graph_model of subgraph, get newly added nodes (now reserved)
+			 (subgraphs,return-nodes) := <get-subgraphs(|new-nodes)> sub_list //Get modesl of rest of subgraphs, get back final list of nodes 
+	get-subgraphs(|all-nodes): [] -> ([],all-nodes)
+	
+	/*Get all Node_ids from a list of statements if they are not in a list of all nodes (which have already been collected)*/
+	get-nodes(|all-nodes): [Node_id(name,_) | stmts] -> (nodes,new-nodes)
+		with if <contains(|name)> all-nodes 
+			then (nodes,new-nodes) := <get-nodes(|all-nodes)> stmts 
+			else (rest,new-nodes) := <get-nodes(|[name |all-nodes])> stmts; nodes := [Node(name,[]) | rest] end
+	get-nodes(|all-nodes): [Stmt_list(_,_) | stmts] -> (nodes,new-nodes)//ignore rest
+		with (nodes,new-nodes) := <get-nodes(|all-nodes)> stmts
+	get-nodes(|all-nodes): [] -> ([],all-nodes)
+	
+	/*Get graph-level attributes from a stmt_list without getting them from subgraphs (only current graph), merge them so that
+		multiple instancs of the same attribute are recorded once*/
+	get-graph-attributes: [Stmt_list(Id(a,b),_) |stmts] -> <merge-attribute(|Attribute(a,b))> <get-graph-attributes> stmts
+	get-graph-attributes: [Stmt_list(_,_) |stmts] -> [|<get-graph-attributes> stmts]
+	get-graph-attributes: [] -> []
+	
+	/*For all subgraphs in a list, merge attributes with theirs (at lower priority), repeat for each sub-subgaph*/
+	cascade-graph-attributes(|new-attr): [Graph_model(name,subgraphs,nodes,old-attr) | graphs] -> 
+		[Graph_model(name,<cascade-graph-attributes(|new-attr)> subgraphs,nodes,<merge-attributes(|old-attr)> new-attr) | <cascade-graph-attributes(|new-attr)> graphs]
+	cascade-graph-attributes(|new-attr): [] -> []
+  

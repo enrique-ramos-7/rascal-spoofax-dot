@@ -1,0 +1,196 @@
+module svg
+
+imports
+  libstratego-lib
+  signatures/dot-sig
+  gen/model
+  gen/concat
+
+strategies
+	print-svg(|graph,edges) = 
+	Graph_model(name,subgraphs,nodes,attributes) := graph;
+	width := <get-attribute(|"max_x","500")> attributes;
+	height := <get-attribute(|"max_y","500")> attributes;
+	g-name := <normalize-string> name;
+	bgcolor := <get-attribute(|"bgcolor","white")> attributes;
+	directed := <get-attribute(|"directed","graph")> attributes;
+	strict := <get-attribute(|"strict","")> attributes;
+	!$[
+		<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="[width]pt" height="[height]pt" viewBox="0.00 0.00 [width].00 [height].00">
+	    <g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(0 0)">
+	    <title>[g-name]</title>
+	    <polygon fill="[bgcolor]" stroke="none" points="0,0 0,[height] [width],[height] [width],0  0,0"/>
+	    [<map(print-subgraph)> <filter-all-subgraphs> subgraphs]
+	    [<map(print-node)> <filter-all-nodes> <filter-all-subgraphs> [graph] ]
+	    [<print-edges(|directed,strict,[])> edges]
+	    </g>
+    	</svg>
+	 
+	  ]
+	  
+rules
+	get-attribute(|name,default):[Attribute(name,val)| attributes] -> val	
+	get-attribute(|name,default):[Attribute(_,_)| attributes] -> <get-attribute(|name,default)> attributes
+	get-attribute(|name,default): [] -> default
+	
+	attribute-exists(|name):[Attribute(name,val)| attributes] -> name	
+	attribute-exists(|name):[Attribute(_,_)| attributes] -> <attribute-exists(|name)> attributes
+	attribute-exists(|name): [] -> []
+		where fail
+			
+	filter-all-subgraphs: [graph |graphs] 
+		-> [graph|<concat(|<filter-all-subgraphs> subgraphs)> <filter-all-subgraphs> graphs] 
+		with Graph_model(_,subgraphs,_,_) := graph
+	filter-all-subgraphs: [] -> []
+	
+	filter-all-nodes: [Graph_model(_,_,nodes,_)|graphs] -> <concat(|nodes)> <filter-all-nodes> graphs
+	filter-all-nodes: [] -> []
+
+	normalize-string: None() -> ""
+	normalize-string: Some(s) -> s
+	normalize-string: s -> s
+	
+	unquote: s -> s-2
+		with if <is-double-quoted> s then s-2 := <un-double-quote> s else s-2 := s end	
+	
+	get-color: attributes -> color
+		with if  <attribute-exists(|"pencolor")> attributes 
+		then color := <get-attribute(|"pencolor","black")> attributes 
+		else color := <get-attribute(|"color","black")> attributes end
+	
+	get-fill(|color): attributes -> fill
+		with if <?"filled"> <get-attribute(|"style","none")>  attributes 
+		then fill := <get-attribute(|"fillcolor",color)> 	
+		else fill := "none" end
+
+	contains(|x): [x |xs] -> []
+	contains(|x): [y |xs] -> <contains(|x)> xs
+	contains(|_): [] -> []
+		where fail
+	
+	print-subgraph: Graph_model(name,subgraphs,nodes,attributes) -> 
+		$[
+			<g id="[g-name]" class="cluster">
+			    <title>[g-name]</title>
+			    <polygon fill="[fill]" stroke="[color]" stroke-width="[penwidth]" points="[initial-x],[initial-y] [initial-x],[max-y] [max-x],[max-y] [max-x],[initial-y]"/>
+			    <text text-anchor="middle" x="[<divS>(<addS>(max-x,initial-x),"2")]" y="[<addS>(initial-y,"25")]" font-family="[fontname]" font-size="[fontsize]">[label]</text>
+			</g>
+		 ]
+		with color := <get-color> attributes;
+			 fill := <get-fill(|color)> attributes;
+			 g-name := <unquote><normalize-string> name;
+			 penwidth := <get-attribute(|"penwidth","1.0")> attributes;
+			 fontsize := <get-attribute(|"fontsize","14.0")> attributes;
+			 fontname := <unquote><get-attribute(|"fontname","Times")> attributes;
+			 label := <unquote><get-attribute(|"label",g-name)> attributes;
+			 initial-x := <get-attribute(|"initial_x","0")> attributes;
+			 initial-y := <get-attribute(|"initial_y","0")> attributes;
+			 max-x := <get-attribute(|"max_x","500")> attributes;
+			 max-y := <get-attribute(|"max_y","500")> attributes
+			 
+	print-node: Node(name,attributes) -> 
+		$[
+			<g id="[n-name]" class="node">
+			    <title>[n-name]</title>
+			    <ellipse fill="[fill]" stroke="[color]" stroke-width="[penwidth]" cx="[cx]" cy="[cy]" rx="[rx]" ry="[ry]"/>
+			    <text text-anchor="middle" x="[cx]" y="[<addS>(cy,"5")]" font-family="[fontname]" font-size="[fontsize]">[label]</text>
+			</g>
+		 ]
+		with color := <get-color> attributes;
+			 fill := <get-fill(|color)> attributes;
+			 n-name := <unquote><normalize-string> name;
+			 penwidth := <get-attribute(|"penwidth","1.0")> attributes;
+			 fontsize := <get-attribute(|"fontsize","14.0")> attributes;
+			 fontname := <unquote> <get-attribute(|"fontname","Times")> attributes;
+			 label := <unquote><get-attribute(|"label",n-name)> attributes;
+			 cx := <get-attribute(|"cx","0")> attributes;
+			 cy := <get-attribute(|"cy","0")> attributes;
+			 rx := <get-attribute(|"rx","500")> attributes;
+			 ry := <get-attribute(|"ry","500")> attributes
+
+
+	print-edges(|directed,strict,edge-pairs): [Edge(a,b,attributes) | edges] -> [e | <print-edges(|directed,strict,new-edge-pairs)> edges]
+		with if <?"strict"> strict //crappy and statement lmao
+			 then if <contains(|(a,b))> edge-pairs 
+			 	  then e := $[]; new-edge-pairs := edge-pairs 
+			 	  else (e,new-edge-pairs) := <print-edge(|directed,strict,edge-pairs)> Edge(a,b,attributes) end 
+			 else (e,new-edge-pairs) := <print-edge(|directed,strict,edge-pairs)> Edge(a,b,attributes) end
+
+	print-edges(|_,_,_): [] -> []
+			 
+	print-edge(|directed,strict,edge-pairs): Edge(a,b,attributes) -> 
+		($[
+			<g id="" class="edge">
+			    <title>[a-name] [b-name]</title>
+			    <path fill="[fill]" stroke="[color]" stroke-width="[penwidth]" d="M [start-x-2],[start-y-2] C [start-x-2],[start-y-2] [curve-x-2],[curve-y-2] [end-x-2],[end-y-2] "/>
+			    [arrow]
+			
+			</g>
+		 ], new-edge-pairs)
+		with Node(a-name,a-attr) := a; Node(b-name,b-attr) := b;
+			 n := <length> <retain-all(?(a,b))> edge-pairs;
+			 color := <get-color> attributes;
+			 fill := <get-fill(|color)> attributes;
+			 penwidth := <get-attribute(|"penwidth","1.0")> attributes;
+			 
+			 cx-1 := <get-attribute(|"cx","1")> a-attr; rx-1 := <get-attribute(|"rx","1")> a-attr;
+			 cy-1 := <get-attribute(|"cy","1")> a-attr; ry-1 := <get-attribute(|"ry","1")> a-attr;	
+			 cx-2 := <get-attribute(|"cx","1")> b-attr; rx-2 := <get-attribute(|"rx","1")> b-attr;
+			 cy-2 := <get-attribute(|"cy","1")> b-attr; ry-2 := <get-attribute(|"ry","1")> b-attr;
+			 dx := <subtS>(cx-2,cx-1); dy := <subtS>(cy-2,cy-1);
+			 
+			 if <?("0","0")> (dx,dy) 
+			 then start-x := <subtS>(cx-1,"5"); end-x := <addS>(cx-1,"5"); start-y := <subtS>(cy-1,ry-1); end-y := start-y;
+			 	  curve-x := cx-1; curve-y := <subtS>(<subtS>(cy-1,ry-1),"30")
+			 else d := <sqrtS>(<addS>(<mulS>(dx,dx),<mulS>(dy,dy))); ux := <div>(<string-to-real>dx,d); uy := <div>(<string-to-real>dy,d);
+			 	  t-1 := <divr>(1,<sqrt>(<addr>(<pow>(<divr>(ux,<string-to-real>rx-1),2),<pow>(<divr>(uy,<string-to-real>ry-1),2))));
+			 	  t-2 := <divr>(1,<sqrt>(<addr>(<pow>(<divr>(ux,<string-to-real>rx-2),2),<pow>(<divr>(uy,<string-to-real>ry-2),2))));
+			 	  start-x := <real-to-string(|0)> <addr>(<string-to-real>cx-1,<mulr>(t-1,ux)); start-y := <real-to-string(|0)> <addr>(<string-to-real>cy-1,<mulr>(t-1,uy));
+			 	  end-x := <real-to-string(|0)> <subtr>(<string-to-real>cx-2,<mulr>(t-2,ux)); end-y := <real-to-string(|0)> <subtr>(<string-to-real>cy-2,<mulr>(t-2,uy));
+			 	  curve-x := start-x; curve-y := start-y
+			 end;
+			 
+			 if	<contains(|(a,b))> edge-pairs
+			 	then if <?("0","0")> (dx,dy) 
+			 			then start-x-2 := start-x; start-y-2 := start-y; end-x-2 := end-x; end-y-2 := end-y; 
+			 				 curve-x-2 := curve-x; curve-y-2 := <addS>(curve-y,<int-to-string><mul>(5,n)) 		 			
+			 			else (start-x-2,start-y-2) := <get-next-coords(|cx-1,cy-1,rx-1,ry-1,n)> (start-x,start-y);
+			 				 (end-x-2,end-y-2) := <get-next-coords(|cx-2,cy-2,rx-2,ry-2,n)> (end-x,end-y);  
+			 				 curve-x-2 := start-x-2; curve-y-2 := start-y-2
+			 		end
+			 	else 
+			 	start-x-2 := start-x; start-y-2 := start-y; end-x-2 := end-x; end-y-2 := end-y; curve-x-2 := curve-x; curve-y-2 := curve-y 
+			 end;
+			 
+			 if <?"graph"> directed
+			 	then new-edge-pairs := <concat(|[(a,b),(b,a)])> edge-pairs
+			 	else new-edge-pairs := <concat(|[(a,b)])> edge-pairs
+			 end;		 			 
+			 
+			 if <?"digraph"> directed 
+			 then arrow :=  
+			 $[<polygon fill="[color]" stroke="[color]" points="[end-x-2],[end-y-2] [<subtS>(end-x-2,"5")],[<subtS>(end-y-2,"5")] [<subtS>(end-x-2,"5")],[<addS>(end-y-2,"5")]"/>] 
+			 else arrow := "" end
+			 
+		sqrtS: (n) ->  <sqrt> <string-to-real> n
+			with <dbg(|"sqrtS")> n
+		pow: (n,1) -> n 
+		pow: (n,e) -> <mulr>(n,<pow>(n,<subt>(e,1))) 
+		
+		get-next-coords(|cx,cy,rx,ry,n): (x,y) -> (x-4,y-4)
+			with x-2 := <subtr>(<string-to-real>x,<string-to-real>cx); y-2 := <subtr>(<string-to-real>y,<string-to-real>cy);
+				 if <gtr> (x-2,0.0) 
+				 	then x-3 := <subtr>(x-2,<mul>(2.0,n))
+				 	else x-3 := <addr>(x-2,<mul>(2.0,n))
+				 end;
+				 if <lt>(y-2,0.0)
+				 	then sign := -1
+				 	else sign := 1
+				 end; 
+				 y-3 := <mul>(<string-to-real>ry,<mul>(sign,<sqrt>(<subtr>(1.0,<div>(<pow>(x-3,2),<pow>(<string-to-real>rx,2) ) ) ) ) );
+				 //y-3 := <sqrt>(<subtr>(1.0,<div>(<pow>(x-3,2),<pow>(<string-to-real>rx,2) ) ) );
+				 //y-3 := <pow>(x-3,2);
+				 x-4 := <real-to-string(|0)> <add>(x-3,<string-to-real>cx); y-4 := <real-to-string(|0)> <add>(y-3,<string-to-real>cy)
+				 
+				 
+				 
