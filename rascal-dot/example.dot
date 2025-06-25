@@ -1,0 +1,21 @@
+
+//comment
+strict graph {   
+    b //comment
+   subgraph c {
+       color = red
+       a [fontname = "comic sans ms", label = "node a", fontsize=0] 
+       c
+       subgraph {
+           color = blue
+           b -- c -- d
+           b -- b 
+           c -- b
+       }
+   }
+   
+   subgraph c2 {
+       t
+       a -- b
+   }
+}

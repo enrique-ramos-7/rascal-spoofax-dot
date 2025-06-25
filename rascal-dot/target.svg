@@ -1,0 +1,114 @@
+
+    <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="800pt" height="550pt" viewBox="0.00 0.00 800.00 550.00">
+    <g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(0 0)">
+    <title></title>
+    <polygon fill="white" stroke="none" points="0,0 0,550 800,550 800,0  0,0"/>
+
+    
+        
+    <g id="" class="cluster">
+    <title></title>
+    <polygon fill="none" stroke="blue" stroke-width="1.0" points="150,150 150,350 400,350 400,150"/>
+    <text text-anchor="middle" x="275" y="175" font-family="Times" font-size="14.0"></text>
+    </g>
+    
+    
+        
+    <g id="c" class="cluster">
+    <title>c</title>
+    <polygon fill="none" stroke="red" stroke-width="1.0" points="100,100 100,450 550,450 550,100"/>
+    <text text-anchor="middle" x="325" y="125" font-family="Times" font-size="14.0">c</text>
+    </g>
+    
+    
+        
+    <g id="c2" class="cluster">
+    <title>c2</title>
+    <polygon fill="none" stroke="black" stroke-width="1.0" points="600,100 600,200 750,200 750,100"/>
+    <text text-anchor="middle" x="675" y="125" font-family="Times" font-size="14.0">c2</text>
+    </g>
+    
+    
+
+    
+        
+    <g id="a" class="node">
+    <title>a</title>
+    <ellipse fill="none" stroke="black" stroke-width="1.0" cx="450" cy="150" rx="35" ry="25"/>
+    <text text-anchor="middle" x="450" y="155" font-family="comic sans ms" font-size="0">node a</text>
+    </g>
+    
+    
+        
+    <g id="b" class="node">
+    <title>b</title>
+    <ellipse fill="none" stroke="black" stroke-width="1.0" cx="200" cy="200" rx="35" ry="25"/>
+    <text text-anchor="middle" x="200" y="205" font-family="Times" font-size="14.0">b</text>
+    </g>
+    
+    
+        
+    <g id="c" class="node">
+    <title>c</title>
+    <ellipse fill="none" stroke="black" stroke-width="1.0" cx="300" cy="200" rx="35" ry="25"/>
+    <text text-anchor="middle" x="300" y="205" font-family="Times" font-size="14.0">c</text>
+    </g>
+    
+    
+        
+    <g id="d" class="node">
+    <title>d</title>
+    <ellipse fill="none" stroke="black" stroke-width="1.0" cx="200" cy="300" rx="35" ry="25"/>
+    <text text-anchor="middle" x="200" y="305" font-family="Times" font-size="14.0">d</text>
+    </g>
+    
+    
+        
+    <g id="t" class="node">
+    <title>t</title>
+    <ellipse fill="none" stroke="black" stroke-width="1.0" cx="650" cy="150" rx="35" ry="25"/>
+    <text text-anchor="middle" x="650" y="155" font-family="Times" font-size="14.0">t</text>
+    </g>
+    
+    
+    
+    
+        
+    <g id="" class="edge">
+    <title>b-c-0</title>
+    <path fill="none" stroke="black" stroke-width="1.0" d="M 235,200 C 235,200 235,200 265,200 "/>
+    
+    </g>
+    
+    
+        
+    <g id="" class="edge">
+    <title>c-d-0</title>
+    <path fill="none" stroke="black" stroke-width="1.0" d="M 280,220 C 280,220 280,220 220,280 "/>
+    
+    </g>
+    
+    
+        
+    <g id="" class="edge">
+    <title>b-b-0</title>
+    <path fill="none" stroke="black" stroke-width="1.0" d="M 195,175 C 195,175 200,145 205,175 "/>
+    
+    </g>
+    
+    
+        
+    
+        
+    <g id="" class="edge">
+    <title>a-b-0</title>
+    <path fill="none" stroke="black" stroke-width="1.0" d="M 416,157 C 416,157 416,157 234,193 "/>
+    
+    </g>
+    
+    
+
+    </g>
+    </svg>
+
+    
