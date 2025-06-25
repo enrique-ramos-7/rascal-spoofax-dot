@@ -1,18 +1,14 @@
-# dot Language Specification
+# DOT IN SPOOFAX
+This folder contains all files for the Spoofax implementation of *DOT*. This implementation is inteded to be run **in Eclipse with the Spoofax plugin.**
 
-## Using Statix for multi-file analysis
+## Running DOT
+To generate SVGs from *DOT* code, open a .dot file and go to Spoofax -> Transformation -> to svg in the toolbar. This should generate a new SVG from the .dot file (you might need to reload the svg window if you're using the Eclipse to view it). Errors and warnings in .dot files should appear on their own.
 
-By default the project is configured to analyze all files of your language in
-isolation -- single-file analysis. It is also possible to configure the project
-such that all files are analyzed together, and files can refer to each other --
-multi-file analysis.
-
-To enable multi-file analysis, do the following:
-1. Uncomment the `(multifile)` option in `editor/Analysis.esv`
-2. Uncomment the multi-file definition, and comment the single-file version, of
-   `editor-analyze` in `trans/analysis.str`.
-
-NB. When working in an IDE such as Eclipse, it is necessary to _restart the IDE_
-after switching from single-file to multi-file analysis or vice versa. Failure to
-do so will result in exceptions during analysis.
-
+## Implementaiton overview
+- syntax/dot.sdf3 contains the syntax definiton using the SDF3 language, used to generate an AST from *DOT* source code
+- trans/dot.str is the main Stratego file for transforming the graph into an intermidate representation
+- trans/gen/generator.str contains code for getting a graph represenation from the AST 
+- trans/gen/layout.str adds layout information to the graph
+- trans/gen/svg.str prints an svg from the graph
+- trans/gen/statix.stx contain validation code for the implementation in the Statix languge
+- editor/Main.esv configures the toolbar to have a button for generating svgs
