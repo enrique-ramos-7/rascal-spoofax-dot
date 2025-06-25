@@ -1,2 +1,2 @@
 # rascal-spoofax-dot
-Limited implementations for the DOT Graphviz DSL in the Rascal and Spoofax Language workbenches
+This repository contains two limited implementations for the *DOT* Graphviz DSL in the Rascal and Spoofax Language workbenches, created for a Bachelor's thesis at the Univeristy of Twente. These implementations were created specifically in order to compare the validation capabilities of each workbench. Both implementations are capable of generating svgs from *DOT*, although not all *DOT* features or attributes are supported.
